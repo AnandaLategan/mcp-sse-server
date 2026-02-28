@@ -1,7 +1,7 @@
 [project]
-name = "mcp-sse-server"
-version = "0.2.0"
-description = "Simple MCP server reference implementation with email sending capability"
+name = "word-mcp-server"
+version = "0.1.0"
+description = "Word document MCP server — fills .docx templates and manages versioned outputs via SharePoint and OneDrive"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -11,6 +11,9 @@ dependencies = [
     "uvicorn>=0.29.0",
     "python-dotenv>=1.0.1",
     "pydantic-settings>=2.0.0",
+    "python-docx>=1.1.2",
+    "docxtpl>=0.20.2",
+    "msal>=1.31.0",
 ]
 
 [project.optional-dependencies]

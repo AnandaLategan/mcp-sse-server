@@ -1,5 +1,5 @@
 """
-Simplified configuration for the MCP server reference implementation.
+Configuration for the Word MCP SSE Server.
 """
 
 from pathlib import Path
@@ -12,13 +12,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings using Pydantic."""
 
-    # Essential MCP server settings
+    # MCP Server Auth
     MCP_SERVER_AUTH_KEY: Optional[str] = None
-    POSTMARK_API_KEY: Optional[str] = None
-    SENDER_EMAIL: Optional[str] = None
+
+    # Azure App Registration (Word MCP)
+    AZURE_TENANT_ID: Optional[str] = None
+    AZURE_CLIENT_ID: Optional[str] = None
+    AZURE_CLIENT_SECRET: Optional[str] = None
+
+    # SharePoint Templates (Word MCP)
+    SHAREPOINT_SITE_URL: Optional[str] = None
+    SHAREPOINT_TEMPLATE_FOLDER: Optional[str] = None
+
+    # OneDrive Output (Word MCP)
+    ONEDRIVE_USER: Optional[str] = None
+    ONEDRIVE_OUTPUT_FOLDER: Optional[str] = None
 
     # Optional settings with defaults
-    LOG_LEVEL: str = "DEBUG"
+    LOG_LEVEL: str = "INFO"
     ENVIRONMENT: str = "development"
     FILE_LOGGING: bool = True
     LOGS_DIR: str = "logs"
@@ -53,7 +64,16 @@ def load_config(dotenv_path: Optional[Path] = None) -> Settings:
     settings = Settings()
 
     # Validate required keys
-    required_keys = ["MCP_SERVER_AUTH_KEY", "POSTMARK_API_KEY", "SENDER_EMAIL"]
+    required_keys = [
+        "MCP_SERVER_AUTH_KEY",
+        "AZURE_TENANT_ID",
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "SHAREPOINT_SITE_URL",
+        "SHAREPOINT_TEMPLATE_FOLDER",
+        "ONEDRIVE_USER",
+        "ONEDRIVE_OUTPUT_FOLDER",
+    ]
     missing_keys = []
 
     for key in required_keys:

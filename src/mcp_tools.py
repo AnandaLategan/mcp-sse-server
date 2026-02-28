@@ -1,5 +1,5 @@
 """
-MCP tools registration for the server reference implementation.
+MCP tools registration for the Word MCP SSE Server.
 """
 
 import importlib
@@ -24,10 +24,7 @@ from . import actions
 # Central place where *all* server-supplied objects live
 DEPENDENCIES: dict[str, object] = {
     # These will be populated by register_tools()
-    # "postmark_api_key": api_key,
-    # "sender_email": from_email,
     # append new shared objects here ↓
-    # "weather_api_key": os.getenv("WEATHER_API_KEY"),
 }
 
 T = TypeVar("T")
@@ -46,6 +43,10 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 
         logger.info(f"[{request_id}] {request.method} {request.url.path}")
 
+        # Skip auth for health endpoint
+        if request.url.path == "/health":
+            return await call_next(request)
+
         # Check API key
         if request.headers.get("X-API-Key") == self.api_key:
             logger.debug(f"[{request_id}] API key authentication successful")
@@ -60,7 +61,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 class MCPServer:
     """Simplified MCP server."""
 
-    def __init__(self, api_key: str, service_name: str = "mcp-reference-server"):
+    def __init__(self, api_key: str, service_name: str = "word-mcp-server"):
         self.api_key = api_key
         self.mcp = FastMCP(service_name)
         logger.info(f"Initialized MCP server: {service_name}")
@@ -78,10 +79,9 @@ class MCPServer:
             request_id = str(uuid.uuid4())
             logger.info(f"[{request_id}] SSE connection established")
 
-            # Quickly respond for health-check style requests to avoid blocking
             if request.method in {"HEAD", "OPTIONS"}:
                 logger.debug(
-                    f"[{request_id}] Non-streaming method {request.method} received – returning 200 without opening SSE stream"
+                    f"[{request_id}] Non-streaming method {request.method} received – returning 200"
                 )
                 return JSONResponse({"status": "ok"}, status_code=200)
 
@@ -101,16 +101,16 @@ class MCPServer:
                 logger.info(f"[{request_id}] SSE connection closed")
 
         async def handle_health(request: Request) -> JSONResponse:
-            """Health check endpoint for Azure Container Apps and load balancers."""
+            """Health check endpoint."""
             return JSONResponse({
                 "status": "healthy",
-                "service": "mcp-sse-server",
+                "service": "word-mcp-server",
                 "version": "1.0.0"
             }, status_code=200)
 
-        # Health endpoint bypasses API key middleware for Azure health checks
+        # Health endpoint bypasses API key middleware
         health_routes = [Route("/health", endpoint=handle_health)]
-        
+
         # Protected routes with API key middleware
         protected_middleware = [Middleware(APIKeyMiddleware, api_key=self.api_key)]
         protected_routes = [
@@ -138,12 +138,12 @@ def make_wrapper(action_func):
     }
 
     async def wrapper(**kwargs):
-        kwargs.update(wanted)       # pre-populate with server objects
+        kwargs.update(wanted)
         return await action_func(**kwargs)
 
     wrapper.__name__ = action_func.__name__.replace("_action", "_tool")
-    wrapper.__doc__  = action_func.__doc__
-    
+    wrapper.__doc__ = action_func.__doc__
+
     # Build a new signature that excludes injected parameters
     params = [
         p for p in sig.parameters.values()
@@ -153,24 +153,32 @@ def make_wrapper(action_func):
         parameters=params,
         return_annotation=sig.return_annotation,
     )
-    
+
     # Copy annotations but remove injected parameters
     if hasattr(action_func, "__annotations__"):
         wrapper.__annotations__ = {
-            k: v for k, v in action_func.__annotations__.items() 
+            k: v for k, v in action_func.__annotations__.items()
             if k not in wanted
         }
-    
+
     return wrapper
 
 
-def register_tools(mcp_server: MCPServer, api_key: str, from_email: str) -> None:
+def register_tools(mcp_server: MCPServer) -> None:
     """Register all MCP tools by auto-discovering action modules."""
 
-    # Populate the dependencies registry
+    # Populate the dependencies registry with Graph client settings
+    from .config import load_config
+    settings = load_config()
+
     DEPENDENCIES.update({
-        "postmark_api_key": api_key,
-        "sender_email": from_email,
+        "azure_tenant_id": settings.AZURE_TENANT_ID,
+        "azure_client_id": settings.AZURE_CLIENT_ID,
+        "azure_client_secret": settings.AZURE_CLIENT_SECRET,
+        "sharepoint_site_url": settings.SHAREPOINT_SITE_URL,
+        "sharepoint_template_folder": settings.SHAREPOINT_TEMPLATE_FOLDER,
+        "onedrive_user": settings.ONEDRIVE_USER,
+        "onedrive_output_folder": settings.ONEDRIVE_OUTPUT_FOLDER,
     })
 
     logger.info("Starting auto-discovery of action modules")
@@ -184,11 +192,8 @@ def register_tools(mcp_server: MCPServer, api_key: str, from_email: str) -> None
             logger.debug(f"Loaded action module: {module_name}")
 
             for name, func in inspect.getmembers(mod, inspect.iscoroutinefunction):
-                # Convention: functions ending in _action are registerable
                 if name.endswith("_action"):
                     logger.info(f"Registering action: {name}")
-
-                    # Create and register the wrapper
                     tool_wrapper = make_wrapper(func)
                     mcp_server.register_tool(tool_wrapper)
 

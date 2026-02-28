@@ -1,7 +1,5 @@
 """
-Simplified MCP server reference implementation.
-
-This server demonstrates a minimal MCP setup with email sending capability.
+Word MCP SSE Server entry point.
 """
 
 import argparse
@@ -20,14 +18,12 @@ def setup_logging(
     """Configure application logging with optional file logging."""
     from pathlib import Path
 
-    # Configure formatters
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Create logger
-    logger = logging.getLogger("mcp-server")
+    logger = logging.getLogger("word-mcp-server")
     logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
     # Clear any existing handlers
@@ -42,7 +38,7 @@ def setup_logging(
     if file_logging:
         logs_path = Path(logs_dir)
         logs_path.mkdir(exist_ok=True)
-        log_file_path = logs_path / "mcp-server.log"
+        log_file_path = logs_path / "word-mcp-server.log"
         file_handler = logging.FileHandler(log_file_path)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
@@ -65,11 +61,10 @@ def main():
         # Load configuration
         config = load_config()
 
-        # Set up logging (after secrets are loaded, set appropriate log level)
+        # Set up logging
         log_level = args.log_level or config.LOG_LEVEL
         logger = setup_logging(log_level, config.FILE_LOGGING, config.LOGS_DIR)
-        
-        # Ensure logging level is appropriate after secrets are loaded
+
         if log_level.upper() == "DEBUG":
             logger.warning("DEBUG logging enabled - ensure no secrets are logged")
 
@@ -77,19 +72,15 @@ def main():
             logger.info(f"Log level overridden to {args.log_level.upper()}")
 
         # Initialize MCP server
-        logger.info("Initializing MCP server")
+        logger.info("Initializing Word MCP server")
         mcp_server = MCPServer(api_key=cast(str, config.MCP_SERVER_AUTH_KEY))
 
         # Register tools
-        logger.info("Registering MCP tools")
-        register_tools(
-            mcp_server=mcp_server,
-            api_key=cast(str, config.POSTMARK_API_KEY),
-            from_email=cast(str, config.SENDER_EMAIL),
-        )
+        logger.info("Registering Word MCP tools")
+        register_tools(mcp_server=mcp_server)
 
         # Create and run app
-        logger.info(f"Starting MCP server on http://{args.host}:{args.port}")
+        logger.info(f"Starting Word MCP server on http://{args.host}:{args.port}")
         app = mcp_server.create_app(debug=True)
 
         # Start server
