@@ -13,7 +13,7 @@ async def list_templates_action(
     azure_tenant_id: str,
     azure_client_id: str,
     azure_client_secret: str,
-    sharepoint_site_url: str,
+    sharepoint_drive_id: str,          # ← changed
     sharepoint_template_folder: str,
 ) -> str:
     """
@@ -33,7 +33,7 @@ async def list_templates_action(
     )
 
     files = await graph.list_sharepoint_files(
-        site_url=sharepoint_site_url,
+        drive_id=sharepoint_drive_id,          # ← changed
         folder_path=sharepoint_template_folder,
     )
 

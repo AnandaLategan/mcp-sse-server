@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     AZURE_CLIENT_SECRET: Optional[str] = None
 
     # SharePoint Templates (Word MCP)
-    SHAREPOINT_SITE_URL: Optional[str] = None
+    SHAREPOINT_DRIVE_ID: Optional[str] = None          # ← changed
     SHAREPOINT_TEMPLATE_FOLDER: Optional[str] = None
 
     # OneDrive Output (Word MCP)
@@ -69,7 +69,7 @@ def load_config(dotenv_path: Optional[Path] = None) -> Settings:
         "AZURE_TENANT_ID",
         "AZURE_CLIENT_ID",
         "AZURE_CLIENT_SECRET",
-        "SHAREPOINT_SITE_URL",
+        "SHAREPOINT_DRIVE_ID",              # ← changed
         "SHAREPOINT_TEMPLATE_FOLDER",
         "ONEDRIVE_USER",
         "ONEDRIVE_OUTPUT_FOLDER",

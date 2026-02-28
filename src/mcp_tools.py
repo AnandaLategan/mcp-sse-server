@@ -175,7 +175,7 @@ def register_tools(mcp_server: MCPServer) -> None:
         "azure_tenant_id": settings.AZURE_TENANT_ID,
         "azure_client_id": settings.AZURE_CLIENT_ID,
         "azure_client_secret": settings.AZURE_CLIENT_SECRET,
-        "sharepoint_site_url": settings.SHAREPOINT_SITE_URL,
+        "sharepoint_drive_id": settings.SHAREPOINT_DRIVE_ID,      # ← changed
         "sharepoint_template_folder": settings.SHAREPOINT_TEMPLATE_FOLDER,
         "onedrive_user": settings.ONEDRIVE_USER,
         "onedrive_output_folder": settings.ONEDRIVE_OUTPUT_FOLDER,

@@ -4,7 +4,7 @@ Handles authentication and all SharePoint/OneDrive operations.
 """
 
 import logging
-from io import BytesIO
+from urllib.parse import quote
 
 import httpx
 import msal
@@ -51,30 +51,19 @@ class GraphClient:
             "Content-Type": "application/json",
         }
 
+    def _encode_path(self, path: str) -> str:
+        """URL encode a path while preserving forward slashes."""
+        return quote(path, safe="/")
+
     # ── SharePoint ─────────────────────────────────────────────────────────────
 
-    async def get_sharepoint_site_id(self, site_url: str) -> str:
-        """Get the SharePoint site ID from a site URL."""
-        # Extract host and path from URL
-        # e.g. https://cyestcorp.sharepoint.com/sites/BSC-Systems
-        parts = site_url.replace("https://", "").split("/", 1)
-        host = parts[0]
-        path = parts[1] if len(parts) > 1 else ""
-
-        url = f"{self.GRAPH_BASE}/sites/{host}:/{path}"
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self._headers())
-            response.raise_for_status()
-            return response.json()["id"]
-
     async def download_sharepoint_file(
-        self, site_url: str, folder_path: str, file_name: str
+        self, drive_id: str, folder_path: str, file_name: str  # ← changed
     ) -> bytes:
         """Download a file from SharePoint and return its bytes."""
-        site_id = await self.get_sharepoint_site_id(site_url)
-        file_path = f"{folder_path}/{file_name}"
+        file_path = self._encode_path(f"{folder_path}/{file_name}")
 
-        url = f"{self.GRAPH_BASE}/sites/{site_id}/drive/root:/{file_path}:/content"
+        url = f"{self.GRAPH_BASE}/drives/{drive_id}/root:/{file_path}:/content"  # ← changed
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 url, headers=self._headers(), follow_redirects=True
@@ -84,12 +73,12 @@ class GraphClient:
             return response.content
 
     async def list_sharepoint_files(
-        self, site_url: str, folder_path: str
+        self, drive_id: str, folder_path: str  # ← changed
     ) -> list[dict]:
         """List files in a SharePoint folder."""
-        site_id = await self.get_sharepoint_site_id(site_url)
+        encoded_path = self._encode_path(folder_path)
 
-        url = f"{self.GRAPH_BASE}/sites/{site_id}/drive/root:/{folder_path}:/children"
+        url = f"{self.GRAPH_BASE}/drives/{drive_id}/root:/{encoded_path}:/children"  # ← changed
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=self._headers())
             response.raise_for_status()
@@ -109,7 +98,7 @@ class GraphClient:
         Upload a file to a OneDrive folder.
         Returns the web URL of the uploaded file.
         """
-        upload_path = f"{folder_path}/{file_name}"
+        upload_path = self._encode_path(f"{folder_path}/{file_name}")
         url = (
             f"{self.GRAPH_BASE}/users/{onedrive_user}/drive/root:/"
             f"{upload_path}:/content"
@@ -124,14 +113,14 @@ class GraphClient:
             response = await client.put(url, headers=headers, content=content)
             response.raise_for_status()
             web_url = response.json().get("webUrl", "")
-            logger.info(f"Uploaded file to OneDrive: {upload_path}")
+            logger.info(f"Uploaded file to OneDrive: {folder_path}/{file_name}")
             return web_url
 
     async def download_onedrive_file(
         self, onedrive_user: str, folder_path: str, file_name: str
     ) -> bytes:
         """Download a file from OneDrive and return its bytes."""
-        file_path = f"{folder_path}/{file_name}"
+        file_path = self._encode_path(f"{folder_path}/{file_name}")
         url = (
             f"{self.GRAPH_BASE}/users/{onedrive_user}/drive/root:/"
             f"{file_path}:/content"
@@ -142,16 +131,17 @@ class GraphClient:
                 url, headers=self._headers(), follow_redirects=True
             )
             response.raise_for_status()
-            logger.info(f"Downloaded OneDrive file: {file_name}")
+            logger.info(f"Downloaded OneDrive file: {folder_path}/{file_name}")
             return response.content
 
     async def list_onedrive_folder(
         self, onedrive_user: str, folder_path: str
     ) -> list[dict]:
         """List files and folders in a OneDrive folder."""
+        encoded_path = self._encode_path(folder_path)
         url = (
             f"{self.GRAPH_BASE}/users/{onedrive_user}/drive/root:/"
-            f"{folder_path}:/children"
+            f"{encoded_path}:/children"
         )
 
         async with httpx.AsyncClient() as client:
@@ -173,7 +163,7 @@ class GraphClient:
         self, onedrive_user: str, folder_path: str, file_name: str, content: str
     ) -> str:
         """Upload a JSON file to OneDrive."""
-        upload_path = f"{folder_path}/{file_name}"
+        upload_path = self._encode_path(f"{folder_path}/{file_name}")
         url = (
             f"{self.GRAPH_BASE}/users/{onedrive_user}/drive/root:/"
             f"{upload_path}:/content"
@@ -187,14 +177,14 @@ class GraphClient:
                 url, headers=headers, content=content.encode("utf-8")
             )
             response.raise_for_status()
-            logger.info(f"Uploaded JSON file to OneDrive: {upload_path}")
+            logger.info(f"Uploaded JSON file to OneDrive: {folder_path}/{file_name}")
             return response.json().get("webUrl", "")
 
     async def download_json_file(
         self, onedrive_user: str, folder_path: str, file_name: str
     ) -> str:
         """Download a JSON file from OneDrive and return its text content."""
-        file_path = f"{folder_path}/{file_name}"
+        file_path = self._encode_path(f"{folder_path}/{file_name}")
         url = (
             f"{self.GRAPH_BASE}/users/{onedrive_user}/drive/root:/"
             f"{file_path}:/content"

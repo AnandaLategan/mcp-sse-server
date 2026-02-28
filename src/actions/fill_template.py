@@ -24,7 +24,7 @@ async def fill_template_action(
     azure_tenant_id: str,
     azure_client_id: str,
     azure_client_secret: str,
-    sharepoint_site_url: str,
+    sharepoint_drive_id: str,              # ← changed
     sharepoint_template_folder: str,
     onedrive_user: str,
     onedrive_output_folder: str,
@@ -93,7 +93,7 @@ async def fill_template_action(
 
     # ── Download template from SharePoint ─────────────────────────────────────
     template_bytes = await graph.download_sharepoint_file(
-        site_url=sharepoint_site_url,
+        drive_id=sharepoint_drive_id,              # ← changed
         folder_path=sharepoint_template_folder,
         file_name=template_name,
     )
