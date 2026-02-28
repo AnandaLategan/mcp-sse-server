@@ -5,7 +5,7 @@ set -e
 IS_UPDATE=false
 
 # Default values
-BASE_NAME="${BASE_NAME:-mcp-sse}"
+BASE_NAME="${BASE_NAME:-word-mcp}"
 ENVIRONMENT="dev"
 REGION_CODE="${REGION_CODE:-weu}"
 RESOURCE_GROUP="rg-${BASE_NAME}-${ENVIRONMENT}-${REGION_CODE}"
@@ -26,35 +26,35 @@ function redeploy_code() {
   local environment=$2
   local resource_group=$3
   local container_registry_name=$4
-  
+
   echo "Redeploying code updates only (no infrastructure changes)..."
-  
-  # Build container image using buildx for proper platform targeting
+
+  # Build container image
   echo "Building container image..."
   docker buildx build --platform linux/amd64 --load -t "${base_name}:latest" ../..
-  
+
   # Log in to container registry
   echo "Logging in to container registry..."
   REGISTRY_USERNAME=$(az acr credential show --name "$container_registry_name" --query "username" -o tsv)
   REGISTRY_PASSWORD=$(az acr credential show --name "$container_registry_name" --query "passwords[0].value" -o tsv)
   echo "Authenticating with registry (credentials masked for security)"
   docker login "${container_registry_name}.azurecr.io" -u "$REGISTRY_USERNAME" -p "$REGISTRY_PASSWORD" >/dev/null 2>&1
-  
+
   # Tag and push container image
   echo "Tagging and pushing updated container image..."
   docker tag "${base_name}:latest" "${container_registry_name}.azurecr.io/${base_name}:latest"
   docker push "${container_registry_name}.azurecr.io/${base_name}:latest"
-  
+
   # Get container app name
   CONTAINER_APP_NAME="ca-${base_name}-${environment}-${REGION_CODE}"
-  
+
   # Restart the container app to pick up new image
   echo "Restarting container app to apply changes..."
   az containerapp update \
     --name "$CONTAINER_APP_NAME" \
     --resource-group "$resource_group" \
     --image "${container_registry_name}.azurecr.io/${base_name}:latest"
-  
+
   echo "Code update deployment complete!"
   echo "Container App: $CONTAINER_APP_NAME"
 }
@@ -62,12 +62,10 @@ function redeploy_code() {
 # Load environment variables from .env file if it exists
 if [ -f "../../.env" ]; then
   echo "Loading environment variables from .env file..."
-  # Load env vars without echoing sensitive values
   set -a
   source ../../.env
   set +a
-  
-  # Use environment value from .env if available
+
   if [ -n "$ENVIRONMENT" ]; then
     echo "Using environment '${ENVIRONMENT}' from .env file"
   fi
@@ -115,31 +113,55 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Compute resource names using Azure naming convention
+# Compute resource names
 CONTAINER_APP_NAME="ca-${BASE_NAME}-${ENVIRONMENT}-${REGION_CODE}"
 CONTAINER_APP_ENV_NAME="cae-${BASE_NAME}-${ENVIRONMENT}-${REGION_CODE}"
 LOG_ANALYTICS_NAME="log-${BASE_NAME}-${ENVIRONMENT}-${REGION_CODE}"
 CONTAINER_REGISTRY_NAME="cr${BASE_NAME//[-_]/}${ENVIRONMENT}${REGION_CODE}"
 
-# Check if required environment variables are set
+# Check required environment variables
 if [ -z "$MCP_SERVER_AUTH_KEY" ]; then
   echo "Error: MCP_SERVER_AUTH_KEY environment variable is not set"
   exit 1
 fi
 
-if [ -z "$POSTMARK_API_KEY" ]; then
-  echo "Error: POSTMARK_API_KEY environment variable is not set"
+if [ -z "$AZURE_TENANT_ID" ]; then
+  echo "Error: AZURE_TENANT_ID environment variable is not set"
   exit 1
 fi
 
-if [ -z "$SENDER_EMAIL" ]; then
-  echo "Error: SENDER_EMAIL environment variable is not set"
+if [ -z "$AZURE_CLIENT_ID" ]; then
+  echo "Error: AZURE_CLIENT_ID environment variable is not set"
+  exit 1
+fi
+
+if [ -z "$AZURE_CLIENT_SECRET" ]; then
+  echo "Error: AZURE_CLIENT_SECRET environment variable is not set"
+  exit 1
+fi
+
+if [ -z "$SHAREPOINT_SITE_URL" ]; then
+  echo "Error: SHAREPOINT_SITE_URL environment variable is not set"
+  exit 1
+fi
+
+if [ -z "$SHAREPOINT_TEMPLATE_FOLDER" ]; then
+  echo "Error: SHAREPOINT_TEMPLATE_FOLDER environment variable is not set"
+  exit 1
+fi
+
+if [ -z "$ONEDRIVE_USER" ]; then
+  echo "Error: ONEDRIVE_USER environment variable is not set"
+  exit 1
+fi
+
+if [ -z "$ONEDRIVE_OUTPUT_FOLDER" ]; then
+  echo "Error: ONEDRIVE_OUTPUT_FOLDER environment variable is not set"
   exit 1
 fi
 
 # Handle update mode
 if [ "$IS_UPDATE" = true ]; then
-  # Check if resource group exists
   if az group show --name "$RESOURCE_GROUP" &>/dev/null; then
     echo "Resource group '$RESOURCE_GROUP' exists. Proceeding with code update."
     redeploy_code "$BASE_NAME" "$ENVIRONMENT" "$RESOURCE_GROUP" "$CONTAINER_REGISTRY_NAME"
@@ -151,24 +173,27 @@ if [ "$IS_UPDATE" = true ]; then
   fi
 fi
 
-# Create resource group if it doesn't exist
+# Create resource group
 echo "Creating resource group '$RESOURCE_GROUP' in '$LOCATION'..."
-az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --tags "Application=${BASE_NAME}" "Environment=${ENVIRONMENT}"
+az group create --name "$RESOURCE_GROUP" --location "$LOCATION" \
+  --tags "Application=${BASE_NAME}" "Environment=${ENVIRONMENT}"
 
-# Build container image using buildx for proper platform targeting
+# Build container image
 echo "Building container image..."
 docker buildx build --platform linux/amd64 --load -t "${BASE_NAME}:latest" ../..
 
-# Create container registry if it doesn't exist
+# Create container registry
 echo "Creating container registry '$CONTAINER_REGISTRY_NAME'..."
-az acr create --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_REGISTRY_NAME" --sku Basic --admin-enabled true
+az acr create --resource-group "$RESOURCE_GROUP" \
+  --name "$CONTAINER_REGISTRY_NAME" --sku Basic --admin-enabled true
 
 # Log in to container registry
 echo "Logging in to container registry..."
 REGISTRY_USERNAME=$(az acr credential show --name "$CONTAINER_REGISTRY_NAME" --query "username" -o tsv)
 REGISTRY_PASSWORD=$(az acr credential show --name "$CONTAINER_REGISTRY_NAME" --query "passwords[0].value" -o tsv)
 echo "Authenticating with registry (credentials masked for security)"
-docker login "${CONTAINER_REGISTRY_NAME}.azurecr.io" -u "$REGISTRY_USERNAME" -p "$REGISTRY_PASSWORD" >/dev/null 2>&1
+docker login "${CONTAINER_REGISTRY_NAME}.azurecr.io" \
+  -u "$REGISTRY_USERNAME" -p "$REGISTRY_PASSWORD" >/dev/null 2>&1
 
 # Tag and push container image
 echo "Tagging and pushing container image..."
@@ -187,9 +212,13 @@ az deployment group create \
     location="$LOCATION" \
     resourceGroupName="$RESOURCE_GROUP" \
     mcpServerAuthKey="$MCP_SERVER_AUTH_KEY" \
-    postmarkApiKey="$POSTMARK_API_KEY" \
-    senderEmail="$SENDER_EMAIL" \
-    testEmailRecipients="$TEST_EMAIL_RECIPIENTS"
+    azureTenantId="$AZURE_TENANT_ID" \
+    azureClientId="$AZURE_CLIENT_ID" \
+    azureClientSecret="$AZURE_CLIENT_SECRET" \
+    sharepointSiteUrl="$SHAREPOINT_SITE_URL" \
+    sharepointTemplateFolder="$SHAREPOINT_TEMPLATE_FOLDER" \
+    onedriveUser="$ONEDRIVE_USER" \
+    onedriveOutputFolder="$ONEDRIVE_OUTPUT_FOLDER"
 
 # Get deployment outputs
 echo "Getting deployment outputs..."
@@ -205,9 +234,10 @@ CONTAINER_APP_NAME=$(az deployment group show \
   --query "properties.outputs.containerAppName.value" \
   --output tsv)
 
-echo "Deployment complete!"
-echo "Container App: $CONTAINER_APP_NAME"
-echo "Container App URL: $CONTAINER_APP_URL"
-echo "Resource Group: $RESOURCE_GROUP"
 echo ""
-echo "For future code updates, run: ./deploy.sh --update" 
+echo "✅ Deployment complete!"
+echo "   Container App: $CONTAINER_APP_NAME"
+echo "   Container App URL: $CONTAINER_APP_URL"
+echo "   Resource Group: $RESOURCE_GROUP"
+echo ""
+echo "For future code updates, run: ./deploy.sh --update"

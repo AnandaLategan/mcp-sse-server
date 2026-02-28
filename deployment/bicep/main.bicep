@@ -1,5 +1,5 @@
 @description('The base name for resources')
-param baseName string = 'mcp-sse'
+param baseName string = 'word-mcp'
 
 @description('The environment (dev, test, prod)')
 param environment string = 'dev'
@@ -17,24 +17,38 @@ param resourceGroupName string = 'rg-${baseName}-${environment}-${regionCode}'
 @secure()
 param mcpServerAuthKey string
 
-@description('The Postmark API Key')
+@description('Azure Tenant ID for Graph API')
 @secure()
-param postmarkApiKey string
+param azureTenantId string
 
-@description('The sender email address')
-param senderEmail string
+@description('Azure Client ID for Graph API')
+@secure()
+param azureClientId string
 
-@description('The test email recipients')
-param testEmailRecipients string = ''
+@description('Azure Client Secret for Graph API')
+@secure()
+param azureClientSecret string
 
-// Define resource naming variables using standard abbreviations
+@description('SharePoint Site URL')
+param sharepointSiteUrl string
+
+@description('SharePoint Template Folder Path')
+param sharepointTemplateFolder string
+
+@description('OneDrive User')
+param onedriveUser string
+
+@description('OneDrive Output Folder')
+param onedriveOutputFolder string
+
+// Define resource naming variables
 var containerAppName = 'ca-${baseName}-${environment}-${regionCode}'
 var containerAppEnvName = 'cae-${baseName}-${environment}-${regionCode}'
 var logAnalyticsName = 'log-${baseName}-${environment}-${regionCode}'
-var containerRegistryName = 'cr${replace(baseName, '-', '')}${environment}${regionCode}'
+var containerRegistryName = 'cr${replace(replace(baseName, \'-\', \'\'), \'_\', \'\')}${environment}${regionCode}'
 var imageName = '${containerRegistryName}.azurecr.io/${baseName}:latest'
 
-// Log analytics workspace for container app monitoring
+// Log analytics workspace
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   name: logAnalyticsName
   location: location
@@ -49,7 +63,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10
   }
 }
 
-// Container registry for storing container images
+// Container registry
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-12-01-preview' = {
   name: containerRegistryName
   location: location
@@ -112,8 +126,16 @@ resource containerApp 'Microsoft.App/containerApps@2022-10-01' = {
           value: mcpServerAuthKey
         }
         {
-          name: 'postmark-api-key'
-          value: postmarkApiKey
+          name: 'azure-tenant-id'
+          value: azureTenantId
+        }
+        {
+          name: 'azure-client-id'
+          value: azureClientId
+        }
+        {
+          name: 'azure-client-secret'
+          value: azureClientSecret
         }
       ]
     }
@@ -132,16 +154,32 @@ resource containerApp 'Microsoft.App/containerApps@2022-10-01' = {
               secretRef: 'mcp-server-auth-key'
             }
             {
-              name: 'POSTMARK_API_KEY'
-              secretRef: 'postmark-api-key'
+              name: 'AZURE_TENANT_ID'
+              secretRef: 'azure-tenant-id'
             }
             {
-              name: 'SENDER_EMAIL'
-              value: senderEmail
+              name: 'AZURE_CLIENT_ID'
+              secretRef: 'azure-client-id'
             }
             {
-              name: 'TEST_EMAIL_RECIPIENTS'
-              value: testEmailRecipients
+              name: 'AZURE_CLIENT_SECRET'
+              secretRef: 'azure-client-secret'
+            }
+            {
+              name: 'SHAREPOINT_SITE_URL'
+              value: sharepointSiteUrl
+            }
+            {
+              name: 'SHAREPOINT_TEMPLATE_FOLDER'
+              value: sharepointTemplateFolder
+            }
+            {
+              name: 'ONEDRIVE_USER'
+              value: onedriveUser
+            }
+            {
+              name: 'ONEDRIVE_OUTPUT_FOLDER'
+              value: onedriveOutputFolder
             }
             {
               name: 'LOG_LEVEL'
@@ -166,8 +204,8 @@ resource containerApp 'Microsoft.App/containerApps@2022-10-01' = {
   }
 }
 
-// Output the container app URL and resource names
+// Outputs
 output containerAppUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
 output containerAppName string = containerAppName
 output containerRegistryName string = containerRegistryName
-output logAnalyticsName string = logAnalyticsName 
+output logAnalyticsName string = logAnalyticsName
