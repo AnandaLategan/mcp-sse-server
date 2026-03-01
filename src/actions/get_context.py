@@ -19,12 +19,12 @@ async def get_context_action(
     azure_tenant_id: str,
     azure_client_id: str,
     azure_client_secret: str,
-    onedrive_user: str,
-    onedrive_output_folder: str,
+    sharepoint_drive_id: str,              # ← changed
+    sharepoint_output_folder: str,         # ← changed
 ) -> str:
     """
     Retrieve all currently filled placeholder values for the latest version
-    of a document project from OneDrive Memory. Call this when the user wants
+    of a document project from SharePoint Memory. Call this when the user wants
     to see what values are already filled in before making edits, or to
     review the current state of a document project.
 
@@ -44,11 +44,11 @@ async def get_context_action(
     )
 
     # ── Get existing project files ─────────────────────────────────────────────
-    project_folder = f"{onedrive_output_folder}/{project_name}"
+    project_folder = f"{sharepoint_output_folder}/{project_name}"
     memory_folder = f"{project_folder}/Memory"
 
-    existing_items = await graph.list_onedrive_folder(
-        onedrive_user=onedrive_user,
+    existing_items = await graph.list_sharepoint_folder(   # ← changed
+        drive_id=sharepoint_drive_id,                      # ← changed
         folder_path=project_folder,
     )
 
@@ -68,8 +68,8 @@ async def get_context_action(
 
     # ── Load Memory JSON ───────────────────────────────────────────────────────
     memory_filename = latest_docx.replace(".docx", ".json")
-    json_str = await graph.download_json_file(
-        onedrive_user=onedrive_user,
+    json_str = await graph.download_sharepoint_json(       # ← changed
+        drive_id=sharepoint_drive_id,                      # ← changed
         folder_path=memory_folder,
         file_name=memory_filename,
     )

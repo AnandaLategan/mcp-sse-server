@@ -20,13 +20,10 @@ class Settings(BaseSettings):
     AZURE_CLIENT_ID: Optional[str] = None
     AZURE_CLIENT_SECRET: Optional[str] = None
 
-    # SharePoint Templates (Word MCP)
-    SHAREPOINT_DRIVE_ID: Optional[str] = None          # ← changed
+    # SharePoint (Word MCP)
+    SHAREPOINT_DRIVE_ID: Optional[str] = None
     SHAREPOINT_TEMPLATE_FOLDER: Optional[str] = None
-
-    # OneDrive Output (Word MCP)
-    ONEDRIVE_USER: Optional[str] = None
-    ONEDRIVE_OUTPUT_FOLDER: Optional[str] = None
+    SHAREPOINT_OUTPUT_FOLDER: Optional[str] = None     # ← added
 
     # Optional settings with defaults
     LOG_LEVEL: str = "INFO"
@@ -69,10 +66,9 @@ def load_config(dotenv_path: Optional[Path] = None) -> Settings:
         "AZURE_TENANT_ID",
         "AZURE_CLIENT_ID",
         "AZURE_CLIENT_SECRET",
-        "SHAREPOINT_DRIVE_ID",              # ← changed
+        "SHAREPOINT_DRIVE_ID",
         "SHAREPOINT_TEMPLATE_FOLDER",
-        "ONEDRIVE_USER",
-        "ONEDRIVE_OUTPUT_FOLDER",
+        "SHAREPOINT_OUTPUT_FOLDER",        # ← added
     ]
     missing_keys = []
 

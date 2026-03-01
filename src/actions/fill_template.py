@@ -1,8 +1,7 @@
 """
-Fill a Word template with context values and save to OneDrive.
+Fill a Word template with context values and save to SharePoint.
 """
 
-import json
 import logging
 
 from ..utils import (
@@ -24,16 +23,15 @@ async def fill_template_action(
     azure_tenant_id: str,
     azure_client_id: str,
     azure_client_secret: str,
-    sharepoint_drive_id: str,              # ← changed
+    sharepoint_drive_id: str,
     sharepoint_template_folder: str,
-    onedrive_user: str,
-    onedrive_output_folder: str,
+    sharepoint_output_folder: str,         # ← changed
 ) -> str:
     """
-    Fill a Word template with the provided values and save it to OneDrive.
+    Fill a Word template with the provided values and save it to SharePoint.
 
     - If the project already has versions, loads the previous context from
-      OneDrive Memory, merges the new replacements on top, and re-renders
+      SharePoint Memory, merges the new replacements on top, and re-renders
       from the original template with the full merged context.
     - If the project is new, renders directly from the template.
     - Always saves as the next incremented version with a matching
@@ -46,7 +44,7 @@ async def fill_template_action(
                       e.g. {"company_name": "BSC Global", "date": "2026-02-28"}
 
     Returns:
-        Success message with the new version filename and OneDrive link.
+        Success message with the new version filename and SharePoint link.
     """
     logger.info(f"Filling template for project: {project_name}")
 
@@ -57,11 +55,11 @@ async def fill_template_action(
     )
 
     # ── Get existing project files ─────────────────────────────────────────────
-    project_folder = f"{onedrive_output_folder}/{project_name}"
+    project_folder = f"{sharepoint_output_folder}/{project_name}"
     memory_folder = f"{project_folder}/Memory"
 
-    existing_items = await graph.list_onedrive_folder(
-        onedrive_user=onedrive_user,
+    existing_items = await graph.list_sharepoint_folder(   # ← changed
+        drive_id=sharepoint_drive_id,                      # ← changed
         folder_path=project_folder,
     )
     existing_files = [
@@ -75,8 +73,8 @@ async def fill_template_action(
     if latest_docx:
         # Load previous Memory JSON
         memory_filename = latest_docx.replace(".docx", ".json")
-        json_str = await graph.download_json_file(
-            onedrive_user=onedrive_user,
+        json_str = await graph.download_sharepoint_json(   # ← changed
+            drive_id=sharepoint_drive_id,                  # ← changed
             folder_path=memory_folder,
             file_name=memory_filename,
         )
@@ -93,7 +91,7 @@ async def fill_template_action(
 
     # ── Download template from SharePoint ─────────────────────────────────────
     template_bytes = await graph.download_sharepoint_file(
-        drive_id=sharepoint_drive_id,              # ← changed
+        drive_id=sharepoint_drive_id,
         folder_path=sharepoint_template_folder,
         file_name=template_name,
     )
@@ -104,18 +102,18 @@ async def fill_template_action(
     # ── Calculate next version filename ───────────────────────────────────────
     new_filename = next_version_filename(project_name, existing_files)
 
-    # ── Upload rendered .docx to OneDrive ─────────────────────────────────────
-    web_url = await graph.upload_onedrive_file(
-        onedrive_user=onedrive_user,
+    # ── Upload rendered .docx to SharePoint ───────────────────────────────────
+    web_url = await graph.upload_sharepoint_file(          # ← changed
+        drive_id=sharepoint_drive_id,                      # ← changed
         folder_path=project_folder,
         file_name=new_filename,
         content=rendered_bytes,
     )
 
-    # ── Upload Memory JSON to OneDrive ─────────────────────────────────────────
+    # ── Upload Memory JSON to SharePoint ──────────────────────────────────────
     memory_filename = new_filename.replace(".docx", ".json")
-    await graph.upload_json_file(
-        onedrive_user=onedrive_user,
+    await graph.upload_sharepoint_json(                    # ← changed
+        drive_id=sharepoint_drive_id,                      # ← changed
         folder_path=memory_folder,
         file_name=memory_filename,
         content=serialize_context(merged_context),
@@ -130,5 +128,5 @@ async def fill_template_action(
         f"   Based on: {base_label}\n"
         f"   Values applied: {list(replacements.keys())}\n"
         f"   Total placeholders filled: {len(merged_context)}\n"
-        f"   Open in OneDrive: {web_url}"
+        f"   Open in SharePoint: {web_url}"
     )
